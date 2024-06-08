@@ -1,0 +1,187 @@
+library(caret)
+library(tree)
+library(ISLR2)
+library(ggplot2)
+library(cowplot)
+data_cancer=read.csv2("/Users/leonardomichi/Desktop/data_cancer.csv", header=T,sep=",",dec=".")
+data_cancer=data.frame(data_cancer)
+data_cancer=data_cancer[-c(1,33)]
+data_cancer$diagnosis=factor(data_cancer$diagnosis)
+set.seed(3)
+#decision tree
+tree.data_cancer=tree(diagnosis~.,data_cancer)
+summary(tree.data_cancer)
+plot(tree.data_cancer,col="grey",lwd=3,label_context)
+text(tree.data_cancer,pretty=1,col="#1E77E8",cex=0.7)
+tree.data_cancer
+train=sample(1:nrow(data_cancer),250)
+data_cancer.test=data_cancer[-train,]
+diagnosis.test=data_cancer$diagnosis[-train]
+tree.data_cancer=tree(data_cancer$diagnosis~.,data_cancer,subset=train)
+tree.pred=predict(tree.data_cancer,data_cancer.test,type = "class")
+#table(tree.pred,diagnosis.test)
+confusionMatrix(tree.pred,diagnosis.test)
+cv.data_cancer=cv.tree(tree.data_cancer,FUN=prune.misclass)
+names(cv.data_cancer)
+cv.data_cancer
+par(mfrow=c(1,2))
+plot(cv.data_cancer$size,cv.data_cancer$dev,type="b",col="#1E77E8",xlab="nodi terminali",ylab="cross-validation errors")
+plot(cv.data_cancer$k,cv.data_cancer$dev, type="b",col="#1E77E8",xlab="cost-complexity parameter",ylab="cross-validation errors")
+prune.data_cancer=prune.misclass(tree.data_cancer,best=4)
+par(mfrow=c(1,1))
+plot(prune.data_cancer,col="grey",lwd=3)
+text(prune.data_cancer,pretty=1,col="#1E77E8")
+tree.pred1=predict(prune.data_cancer,data_cancer.test,type="class")
+#table(tree.pred,diagnosis.test)
+matrice1=confusionMatrix(tree.pred1,diagnosis.test)
+matrice1
+prune.data_cancer=prune.misclass(tree.data_cancer,best=5)
+par(mfrow=c(1,1))
+plot(prune.data_cancer,col="grey",lwd=1.5)
+text(prune.data_cancer,pretty=1,col="#1E77E8",cex=0.8)
+tree.pred=predict(prune.data_cancer,data_cancer.test,type="class")
+#table(tree.pred,diagnosis.test)
+confusionMatrix(tree.pred,diagnosis.test)
+#bagging
+library(randomForest)
+set.seed(4)
+bag.data_cancer=randomForest(diagnosis~.,data_cancer,mtry=30,subset=train,importance=T)
+bag.data_cancer
+#plot(bag.data_cancer)
+oob.error.data=data.frame(Trees=rep(1:nrow(bag.data_cancer$err.rate),times=3),
+                          Type=rep(c("OOB","B","M"),
+                                   each=nrow(bag.data_cancer$err.rate)),
+                          Error=c(bag.data_cancer$err.rate[,"OOB"],bag.data_cancer$err.rate[,"B"],bag.data_cancer$err.rate[,"M"]))
+ggplot(data=oob.error.data,aes(x=Trees,y=Error))+geom_line(aes(color=Type))
+bag.data_cancer.test=data_cancer[-train,]
+bag.diagnosis.test=data_cancer$diagnosis[-train]
+tree.pred2=predict(bag.data_cancer,bag.data_cancer.test,type="class")
+#table(tree.pred,bag.diagnosis.test)
+matrice2=confusionMatrix(tree.pred2,diagnosis.test)
+matrice2
+library(car)
+colors <- c("#56B4E9", "#E69F00")
+scatterplotMatrix(data_cancer[,2:5],groups=data_cancer$diagnosis,lower.panel=NULL,col=colors)
+cor(data_cancer[-1])
+#randomForest
+set.seed(1)
+rf.data_cancer=randomForest(diagnosis~.,data_cancer,subset=train,mtry=5,importance=T)
+rf.data_cancer
+oob.error.data=data.frame(Trees=rep(1:nrow(rf.data_cancer$err.rate),times=3),
+               Type=rep(c("OOB","B","M"),
+               each=nrow(rf.data_cancer$err.rate)),
+               Error=c(rf.data_cancer$err.rate[,"OOB"],rf.data_cancer$err.rate[,"B"],rf.data_cancer$err.rate[,"M"]))
+ggplot(data=oob.error.data,aes(x=Trees,y=Error))+geom_line(aes(color=Type))
+#plot(rf.data_cancer)
+rf.data_cancer.test=data_cancer[-train,]
+rf.diagnosis.test=data_cancer$diagnosis[-train]
+tree.pred3=predict(rf.data_cancer,rf.data_cancer.test,type="class")
+#table(tree.pred,rf.diagnosis.test)
+matrice3=confusionMatrix(tree.pred3,diagnosis.test)
+matrice3
+importance(rf.data_cancer)
+varImpPlot(rf.data_cancer,col="#1E77E8",main="Misure di importanza delle variabili")
+#boosting
+library(gbm)
+set.seed(1)
+data_cancer$diagnosis=as.numeric(data_cancer$diagnosis)-1
+boost.data_cancer=gbm(diagnosis~.,data_cancer[train,],shrinkage=0.01,distribution = "bernoulli",n.trees=5000,interaction.depth=4)
+summary(boost.data_cancer)
+#plot(boost.data_cancer,i="radius_worst")
+boost.data_cancer.test=data_cancer[-train,]
+boost.diagnosis.test=data_cancer$diagnosis[-train]
+tree.pred4=predict.gbm(boost.data_cancer,boost.data_cancer.test,n.trees = 5000,type = "response")
+#table(tree.pred,boost.diagnosis.test)
+tree.pred4=as.numeric(tree.pred4 > 0.5)
+matrice4=confusionMatrix(factor(tree.pred4),factor(boost.diagnosis.test))
+matrice4
+decision_tree=matrice1$overall[c(1,3,4)]
+baggin
+g_tree=matrice2$overall[c(1,3,4)]
+randomforest=matrice3$overall[c(1,3,4)]
+Boosting_tree=matrice4$overall[c(1,3,4)]
+decision_tree
+bagging_tree
+randomforest
+Boosting_tree
+boxplot(decision_tree,bagging_tree,randomforest,Boosting_tree,names=c("decision tree","Bagging","randomforest","Boosting"),col="#1E77E8",border = "#E56E45")
+
+df=read.csv2("/Users/leonardomichi/Desktop/winequality-red.csv",header=T,sep=";",dec=".")
+good=factor(ifelse(df$quality<=5,"no","yes"))
+df=data.frame(df,good)
+df=df[-12]
+summary(df)
+cor(df[-12])
+colors <- c("#81F749", "#4983F7")
+scatterplotMatrix(df[,1:4],groups = df$good,col = colors,lower.panel=NULL)
+#hist(df$citric.acid)
+#shapiro.test(df$citric.acid)
+set.seed(5)
+#regressione logistica
+train=sample(1:nrow(df),1000)
+df.test=df[-train,]
+good.test=df$good[-train]
+log.reg=glm(good~volatile.acidity+free.sulfur.dioxide+total.sulfur.dioxide+sulphates+alcohol,data=df,family = binomial,subset = train)
+summary(log.reg)
+coef(log.reg)
+log.pred=predict(log.reg,df.test,type = "response")
+log.pred[1:10]
+contrasts(good)
+pred=rep("no",599)
+pred[log.pred>0.5]="yes"
+matrice1=confusionMatrix(as.factor(pred),good.test)
+#table(pred,good)
+
+#linear disciminant analysis
+library(MASS)
+lda.fit=lda(good~volatile.acidity+free.sulfur.dioxide+total.sulfur.dioxide+sulphates+alcohol,data=df,subset = train)
+lda.fit
+plot(lda.fit)
+lda.pred=predict(lda.fit,df.test)
+lda.class=lda.pred$class
+matrice2=confusionMatrix(lda.class,good.test)
+#ldahist(lda.pred$x,g=df$good)
+#Naive Bayes
+library(e1071)
+nb.fit=naiveBayes(good~volatile.acidity+free.sulfur.dioxide+total.sulfur.dioxide+sulphates+alcohol,data=df,subset = train)
+nb.fit
+nb.class=predict(nb.fit,df.test)
+matrice3=confusionMatrix(nb.class,good.test)
+#alberi
+#decision tree
+#tree.fit=tree(good~.,df,subset=train)
+#summary(tree.fit)
+#tree.pred=predict(tree.fit,df.test,type="class")
+#confusionMatrix(tree.pred,good.test)
+library(randomForest)
+#bagging
+bag.fit=randomForest(good~.,df,mtry=11,subset=train,importance=T)
+bag.fit
+bag.pred=predict(bag.fit,df.test,type="class")
+matrice4=confusionMatrix(bag.pred,good.test)
+#randomforest
+rf.fit=randomForest(good~.,df,subset=train,mtry=3,importance=T)
+rf.fit
+#oob.error.data=data.frame(Trees=rep(1:nrow(rf.fit$err.rate),times=3),
+ #                         Type=rep(c("OOB","Yes","No"),
+  #                                 each=nrow(rf.fit$err.rate)),
+   #                       Error=c(rf.fit$err.rate[,"OOB"],rf.fit$err.rate[,"Yes"],rf.fit$err.rate[,"No"]))
+#ggplot(data=oob.error.data,aes(x=Trees,y=Error))+geom_line(aes(color=Type))
+rf.pred=predict(rf.fit,df.test,type="class")
+confusionMatrix(rf.pred,good.test)
+importance(rf.fit)
+varImpPlot(rf.fit,col="#1E77E8",main="Misure di importanza delle variabili")
+#boosting
+library(gbm)
+df$good=as.numeric(df$good)-1
+good.test=df$good[-train]
+boost.fit=gbm(good~.,df[train,],shrinkage=0.01,distribution = "bernoulli",n.trees=5000,interaction.depth=4)
+summary(boost.fit)
+boost.pred=predict.gbm(boost.fit,df.test,n.trees = 5000,type = "response")
+boost.pred=as.numeric(boost.pred>0.5)
+confusionMatrix(factor(boost.pred),factor(good.test))
+reg.log=matrice1$overall[c(1,3,4)]
+lda=matrice2$overall[c(1,3,4)]
+Bayes=matrice3$overall[c(1,3,4)]
+random.forest=matrice4$overall[c(1,3,4)]
+boxplot(reg.log,lda,Bayes,random.forest,names=c("regressione logistica","LDA","naive Bayes","random forest"),col="#1E77E8",border = "#E56E45")
